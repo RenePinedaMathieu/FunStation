@@ -1803,7 +1803,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 984115231}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: SinmiStation.Core.MusicManager, Assembly-CSharp
         m_MethodName: ToggleMute
         m_Mode: 1
@@ -1862,7 +1862,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 984115232}
-  - component: {fileID: 984115231}
   m_Layer: 0
   m_Name: MusicManager
   m_TagString: Untagged
@@ -1870,20 +1869,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &984115231
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 984115230}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f6cdcd5d4186d1844841acae71dc558d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SinmiStation.Core.MusicManager
-  audioSource: {fileID: 0}
-  mainTheme: {fileID: 0}
 --- !u!4 &984115232
 Transform:
   m_ObjectHideFlags: 0
@@ -2344,7 +2329,7 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 984115231}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: SinmiStation.Core.MusicManager, Assembly-CSharp
         m_MethodName: SetVolume
         m_Mode: 4
@@ -2923,12 +2908,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3d876aa0ae4b8604e887c54ae4d25f41, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SinmiStation.UI.MainMenuController
-  namePanel: {fileID: 192682478}
-  mainMenuPanel: {fileID: 1451765380}
-  nameInput: {fileID: 597226833}
-  nameLabelError: {fileID: 0}
-  welcomeText: {fileID: 1755145590}
-  firstGameSceneName: GamePlaceholder
+  volumeSlider: {fileID: 0}
 --- !u!4 &1978709777
 Transform:
   m_ObjectHideFlags: 0

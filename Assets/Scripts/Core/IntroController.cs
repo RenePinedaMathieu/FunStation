@@ -1,36 +1,66 @@
 using UnityEngine;
-using UnityEngine.Video;
 using UnityEngine.SceneManagement;
+using UnityEngine.Video;
+using System.IO;
 
 public class IntroController : MonoBehaviour
 {
+    [Header("Video")]
     public VideoPlayer videoPlayer;
+    public string videoFileName = "sinmi_intro.mp4";
+
+    [Header("Flow")]
+    public string nextSceneName = "MainMenu";
+    public float failSafeSeconds = 12f;   // por si el video no arranca
+
+    private bool alreadyLoading = false;
+    private bool started = false;
 
     void Start()
     {
+        if (videoPlayer == null)
+            videoPlayer = GetComponent<VideoPlayer>();
+
         if (videoPlayer != null)
-        {
-            // Evento que se dispara cuando termina el video
             videoPlayer.loopPointReached += OnVideoFinished;
-        }
+
+        // Nunca nos quedamos pegados, aunque el video falle
+        StartCoroutine(FailSafe());
     }
 
-    void OnDestroy()
+    // Llamado desde un botón "Tap to start" o similar
+    public void StartIntro()
     {
-        if (videoPlayer != null)
-        {
-            videoPlayer.loopPointReached -= OnVideoFinished;
-        }
+        if (started || videoPlayer == null) return;
+        started = true;
+
+        string url = Path.Combine(Application.streamingAssetsPath, videoFileName);
+        videoPlayer.source = VideoSource.Url;
+        videoPlayer.url = url;
+
+        videoPlayer.Play();
     }
 
-    private void OnVideoFinished(VideoPlayer vp)
+    void OnVideoFinished(VideoPlayer vp)
     {
-        SceneManager.LoadScene("MainMenu");  // nombre exacto de la escena
+        LoadNextScene();
     }
 
-    // Si quieres un botón "Skip"
     public void SkipIntro()
     {
-        SceneManager.LoadScene("MainMenu");
+        LoadNextScene();
+    }
+
+    private void LoadNextScene()
+    {
+        if (alreadyLoading) return;
+        alreadyLoading = true;
+        SceneManager.LoadScene(nextSceneName);
+    }
+
+    System.Collections.IEnumerator FailSafe()
+    {
+        yield return new WaitForSeconds(failSafeSeconds);
+        LoadNextScene();
     }
 }
