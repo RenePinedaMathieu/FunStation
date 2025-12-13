@@ -23,6 +23,9 @@ public class MusicManager : MonoBehaviour
         src = GetComponent<AudioSource>();
         src.loop = true;
         src.playOnAwake = false;
+        src.spatialBlend = 0f;     // 2D
+        src.mute = false;
+        if (src.volume <= 0f) src.volume = 1f;
 
         if (menuMusic != null)
             src.clip = menuMusic;
@@ -31,7 +34,23 @@ public class MusicManager : MonoBehaviour
     public void EnsurePlaying()
     {
         if (src == null) return;
+
+        // Make sure global audio isn't paused/muted
+        AudioListener.pause = false;
+        if (AudioListener.volume <= 0f) AudioListener.volume = 1f;
+
         if (src.clip == null && menuMusic != null) src.clip = menuMusic;
-        if (src.clip != null && !src.isPlaying) src.Play();
+        if (src.clip == null) return;
+
+        src.mute = false;
+        if (src.volume <= 0f) src.volume = 1f;
+
+        // If it was paused, unpause; otherwise play
+        if (!src.isPlaying)
+        {
+            // UnPause only works if it was paused before; Play is safe always
+            src.UnPause();
+            if (!src.isPlaying) src.Play();
+        }
     }
 }

@@ -8,8 +8,8 @@ public class CircleGameManager : MonoBehaviour
 {
     [Header("Gameplay")]
     public RectTransform spawnArea;
-    public CircleTarget circlePrefab;
-    public float circleLifetime = 2f;
+    public CritterTarget targetPrefab;       // ✅ was CircleTarget
+    public float targetLifetime = 2f;
     public float gameDuration = 60f;
     public float spawnPadding = 90f;
 
@@ -35,16 +35,16 @@ public class CircleGameManager : MonoBehaviour
     float timeLeft;
     bool running;
 
-    CircleTarget current;
+    // ✅ expose running to CritterTarget
+    public bool IsRunning => running;
 
-    // ✅ guards
+    CritterTarget current;
+
+    // end/online guards
     bool ended = false;
     bool onlineRequestInFlight = false;
 
-    void Start()
-    {
-        StartGame();
-    }
+    void Start() => StartGame();
 
     void Update()
     {
@@ -71,28 +71,26 @@ public class CircleGameManager : MonoBehaviour
         misses = 0;
         timeLeft = gameDuration;
 
-        if (instructions) instructions.SetActive(false);
+        if (instructions) instructions.SetActive(true);
         if (gameOverPanel) gameOverPanel.SetActive(false);
 
         UpdateHUD();
-        SpawnNewCircle();
+        SpawnNewTarget();
     }
 
-    // ✅ public entrypoint (can be called from timer or quit button)
     public void EndGame()
     {
-        if (ended) return;   // prevents double calls
+        if (ended) return;
         ended = true;
 
         running = false;
 
         if (current) Destroy(current.gameObject);
 
-        // Final UI
         if (finalScoreText) finalScoreText.text = $"Taps: {score}";
         if (finalMissText) finalMissText.text = $"Misses: {misses}";
 
-        // Local highscores immediately (fast + works offline)
+        // local highscores
         if (highscoreUI)
         {
             string playerName = PlayerPrefs.GetString("playerName", "Player");
@@ -102,7 +100,6 @@ public class CircleGameManager : MonoBehaviour
 
         if (gameOverPanel) gameOverPanel.SetActive(true);
 
-        // Online submit/fetch in background (won't spam)
         _ = SubmitOnlineOnce();
     }
 
@@ -113,21 +110,12 @@ public class CircleGameManager : MonoBehaviour
 
         try
         {
-            if (UGSBoot.InitTask != null)
-                await UGSBoot.InitTask;
+            if (UGSBoot.InitTask != null) await UGSBoot.InitTask;
+            if (!UGSBoot.Ready) return;
 
-            if (!UGSBoot.Ready)
-            {
-                Debug.LogWarning("UGS not ready; skipping online leaderboard.");
-                return;
-            }
-
-            // Submit + fetch top 10
             await LeaderboardsService.Instance.AddPlayerScoreAsync("Circles", score);
             var top10 = await LeaderboardsService.Instance.GetScoresAsync("Circles");
-
-            if (highscoreUI)
-                highscoreUI.RenderUGS(top10);
+            if (highscoreUI) highscoreUI.RenderUGS(top10);
         }
         catch (System.Exception e)
         {
@@ -146,15 +134,14 @@ public class CircleGameManager : MonoBehaviour
         if (timerText) timerText.text = $"Time: {Mathf.CeilToInt(timeLeft)}";
     }
 
-    void SpawnNewCircle()
+    void SpawnNewTarget()
     {
         if (!running) return;
 
-        if (current) Destroy(current.gameObject);
+        current = Instantiate(targetPrefab, spawnArea);
+        current.Init(this, spawnArea, targetLifetime, spawnPadding);
 
-        current = Instantiate(circlePrefab, spawnArea);
-        current.Init(this, circleLifetime);
-
+        // random anchored position
         Rect r = spawnArea.rect;
         float xMin = r.xMin + spawnPadding;
         float xMax = r.xMax - spawnPadding;
@@ -165,23 +152,28 @@ public class CircleGameManager : MonoBehaviour
         float y = Random.Range(yMin, yMax);
 
         current.Rect.anchoredPosition = new Vector2(x, y);
-        current.Rect.localScale = Vector3.one;
     }
 
-    public void OnCircleTapped()
+    // called by CritterTarget when tapped (shows death sprite first)
+    public void OnTargetTapped(CritterTarget t)
     {
         if (!running) return;
         score++;
         UpdateHUD();
-        SpawnNewCircle();
+
+        // spawn next after death sprite shows
+        float delay = Mathf.Max(0.05f, t != null ? t.deathShowTime : 0.2f);
+        Invoke(nameof(SpawnNewTarget), delay);
     }
 
-    public void OnCircleExpired()
+    // called by CritterTarget when lifetime ends
+    public void OnTargetExpired(CritterTarget t)
     {
         if (!running) return;
-        SpawnNewCircle();
+        SpawnNewTarget();
     }
 
+    // background tap catcher (miss taps)
     public void OnMissTap()
     {
         if (!running) return;
@@ -189,15 +181,8 @@ public class CircleGameManager : MonoBehaviour
         UpdateHUD();
     }
 
-    public void Retry()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-    }
-
-    public void QuitGame()
-    {
-        SceneManager.LoadScene(quitSceneName);
-    }
+    public void Retry() => SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    public void QuitGame() => SceneManager.LoadScene(quitSceneName);
 
     public void QuitRunNow()
     {

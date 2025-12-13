@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using Unity.Services.Leaderboards.Models;
+using System.Text.RegularExpressions;
 
 public class HighscoreUI : MonoBehaviour
 {
@@ -47,7 +48,11 @@ public class HighscoreUI : MonoBehaviour
             if (page != null && i < page.Results.Count)
             {
                 var e = page.Results[i];
-                rows[i].text = $"{rank}. {e.PlayerName} — {(int)e.Score}";
+
+                // ✅ remove the "#1234" at the end (display only)
+                string shownName = Regex.Replace(e.PlayerName ?? "", @"#\d{4}$", "");
+
+                rows[i].text = $"{rank}. {shownName} — {(int)e.Score}";
             }
             else
             {
@@ -55,4 +60,5 @@ public class HighscoreUI : MonoBehaviour
             }
         }
     }
+
 }

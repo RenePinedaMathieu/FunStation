@@ -1,6 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using Unity.Services.Authentication;
 
 public class ProfileAndGameSelect : MonoBehaviour
 {
@@ -12,8 +16,8 @@ public class ProfileAndGameSelect : MonoBehaviour
     public TMP_InputField nameInput;
 
     [Header("Active Name Badge")]
-    public GameObject nameBadge;        // el panel/cajita
-    public TMP_Text activeNameText;     // el texto dentro (TMP)
+    public GameObject nameBadge;
+    public TMP_Text activeNameText;
 
     [Header("Tiles (Buttons)")]
     public Button tileTap;
@@ -22,7 +26,7 @@ public class ProfileAndGameSelect : MonoBehaviour
     [Header("Yellow border (Outline)")]
     public Outline tapOutline;
     public Outline stackOutline;
-    public Color borderColor = new Color(1f, 0.85f, 0.2f, 1f); // amarillo
+    public Color borderColor = new Color(1f, 0.85f, 0.2f, 1f);
     public Vector2 borderSize = new Vector2(6f, 6f);
 
     int selectedGame = 0;
@@ -31,7 +35,6 @@ public class ProfileAndGameSelect : MonoBehaviour
     {
         selectedGame = PlayerPrefs.GetInt("selectedGame", 0);
 
-        // Asegurar outlines y configurar estilo
         SetupOutline(ref tapOutline, tileTap);
         SetupOutline(ref stackOutline, tileStack);
         ApplyBorder();
@@ -39,14 +42,12 @@ public class ProfileAndGameSelect : MonoBehaviour
         if (tileTap) tileTap.onClick.AddListener(() => SelectGame(0));
         if (tileStack) tileStack.onClick.AddListener(() => SelectGame(1));
 
-        // Flujo por nombre guardado
         var savedName = PlayerPrefs.GetString("playerName", "");
         bool hasName = !string.IsNullOrWhiteSpace(savedName);
 
         if (namePanel) namePanel.SetActive(!hasName);
         if (gameSelectPanel) gameSelectPanel.SetActive(hasName);
 
-        // Mostrar cajita con nombre (si corresponde)
         RefreshNameBadge();
     }
 
@@ -54,7 +55,6 @@ public class ProfileAndGameSelect : MonoBehaviour
     {
         if (btn == null) return;
 
-        // outline debe ir en el Image del botón
         var img = btn.GetComponent<Image>();
         if (img == null) img = btn.GetComponentInChildren<Image>();
 
@@ -66,7 +66,7 @@ public class ProfileAndGameSelect : MonoBehaviour
             outline.effectColor = borderColor;
             outline.effectDistance = borderSize;
             outline.useGraphicAlpha = false;
-            outline.enabled = false; // se prende solo cuando se selecciona
+            outline.enabled = false;
         }
     }
 
@@ -98,6 +98,9 @@ public class ProfileAndGameSelect : MonoBehaviour
 
         // para WebGL (audio se desbloquea con un click)
         if (MusicManager.I != null) MusicManager.I.EnsurePlaying();
+
+        // ✅ NEW: update UGS display name (non-blocking, doesn’t change method signature)
+        _ = PushNameToUGSAsync(n);
     }
 
     public void ChangeUser()
@@ -120,8 +123,6 @@ public class ProfileAndGameSelect : MonoBehaviour
         PlayerPrefs.Save();
 
         ApplyBorder();
-
-        // (no es necesario refrescar nombre acá, pero no molesta)
         RefreshNameBadge();
 
         if (MusicManager.I != null) MusicManager.I.EnsurePlaying();
@@ -131,5 +132,30 @@ public class ProfileAndGameSelect : MonoBehaviour
     {
         if (tapOutline) tapOutline.enabled = (selectedGame == 0);
         if (stackOutline) stackOutline.enabled = (selectedGame == 1);
+    }
+
+    static async Task PushNameToUGSAsync(string rawName)
+    {
+        try
+        {
+            if (UGSBoot.InitTask != null) await UGSBoot.InitTask;
+            if (!UGSBoot.Ready) return;
+
+            string clean = SanitizeUGSName(rawName);
+            await AuthenticationService.Instance.UpdatePlayerNameAsync(clean);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("UGS name update failed: " + e.Message);
+        }
+    }
+
+    static string SanitizeUGSName(string s)
+    {
+        s = (s ?? "Player").Trim();
+        s = Regex.Replace(s, @"\s+", "_");
+        if (s.Length > 50) s = s.Substring(0, 50);
+        if (string.IsNullOrEmpty(s)) s = "Player";
+        return s;
     }
 }
