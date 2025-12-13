@@ -1,15 +1,17 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
+using Unity.Services.Leaderboards;
+using System.Threading.Tasks;
 
 public class CircleGameManager : MonoBehaviour
 {
     [Header("Gameplay")]
-    public RectTransform spawnArea;              // full-screen panel area (RectTransform)
-    public CircleTarget circlePrefab;            // UI prefab
+    public RectTransform spawnArea;
+    public CircleTarget circlePrefab;
     public float circleLifetime = 2f;
     public float gameDuration = 60f;
-    public float spawnPadding = 90f;            // keep circle away from edges
+    public float spawnPadding = 90f;
 
     [Header("UI (HUD)")]
     public TMP_Text scoreText;
@@ -17,16 +19,16 @@ public class CircleGameManager : MonoBehaviour
     public TMP_Text timerText;
 
     [Header("UI (Instructions)")]
-    public GameObject instructions;             // your instructions text object
+    public GameObject instructions;
 
     [Header("UI (Game Over)")]
-    public GameObject gameOverPanel;            // panel with highscore + buttons
+    public GameObject gameOverPanel;
     public TMP_Text finalScoreText;
     public TMP_Text finalMissText;
     public HighscoreUI highscoreUI;
 
     [Header("Scene Navigation")]
-    public string quitSceneName = "MainMenu";   // change to your menu scene name
+    public string quitSceneName = "MainMenu";
 
     int score;
     int misses;
@@ -34,6 +36,10 @@ public class CircleGameManager : MonoBehaviour
     bool running;
 
     CircleTarget current;
+
+    // ✅ guards
+    bool ended = false;
+    bool onlineRequestInFlight = false;
 
     void Start()
     {
@@ -57,6 +63,9 @@ public class CircleGameManager : MonoBehaviour
 
     public void StartGame()
     {
+        ended = false;
+        onlineRequestInFlight = false;
+
         running = true;
         score = 0;
         misses = 0;
@@ -69,26 +78,66 @@ public class CircleGameManager : MonoBehaviour
         SpawnNewCircle();
     }
 
-void EndGame()
-{
-    running = false;
-
-    if (current) Destroy(current.gameObject);
-
-    if (finalScoreText) finalScoreText.text = $"Taps: {score}";
-    if (finalMissText) finalMissText.text = $"Misses: {misses}";
-
-    // update + render highscores (top 10) WITH NAME
-    if (highscoreUI)
+    // ✅ public entrypoint (can be called from timer or quit button)
+    public void EndGame()
     {
-        string playerName = PlayerPrefs.GetString("playerName", "Player");
-        var list = HighscoreStorage.RegisterScore(playerName, score, misses);
-        highscoreUI.Render(list);
+        if (ended) return;   // prevents double calls
+        ended = true;
+
+        running = false;
+
+        if (current) Destroy(current.gameObject);
+
+        // Final UI
+        if (finalScoreText) finalScoreText.text = $"Taps: {score}";
+        if (finalMissText) finalMissText.text = $"Misses: {misses}";
+
+        // Local highscores immediately (fast + works offline)
+        if (highscoreUI)
+        {
+            string playerName = PlayerPrefs.GetString("playerName", "Player");
+            var list = HighscoreStorage.RegisterScore(playerName, score, misses);
+            highscoreUI.Render(list);
+        }
+
+        if (gameOverPanel) gameOverPanel.SetActive(true);
+
+        // Online submit/fetch in background (won't spam)
+        _ = SubmitOnlineOnce();
     }
 
-    if (gameOverPanel) gameOverPanel.SetActive(true);
-}
+    async Task SubmitOnlineOnce()
+    {
+        if (onlineRequestInFlight) return;
+        onlineRequestInFlight = true;
 
+        try
+        {
+            if (UGSBoot.InitTask != null)
+                await UGSBoot.InitTask;
+
+            if (!UGSBoot.Ready)
+            {
+                Debug.LogWarning("UGS not ready; skipping online leaderboard.");
+                return;
+            }
+
+            // Submit + fetch top 10
+            await LeaderboardsService.Instance.AddPlayerScoreAsync("Circles", score);
+            var top10 = await LeaderboardsService.Instance.GetScoresAsync("Circles");
+
+            if (highscoreUI)
+                highscoreUI.RenderUGS(top10);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("Online leaderboard failed: " + e.Message);
+        }
+        finally
+        {
+            onlineRequestInFlight = false;
+        }
+    }
 
     void UpdateHUD()
     {
@@ -106,7 +155,6 @@ void EndGame()
         current = Instantiate(circlePrefab, spawnArea);
         current.Init(this, circleLifetime);
 
-        // Random anchored position inside spawnArea rect (with padding)
         Rect r = spawnArea.rect;
         float xMin = r.xMin + spawnPadding;
         float xMax = r.xMax - spawnPadding;
@@ -120,7 +168,6 @@ void EndGame()
         current.Rect.localScale = Vector3.one;
     }
 
-    // called by circle when tapped
     public void OnCircleTapped()
     {
         if (!running) return;
@@ -129,14 +176,12 @@ void EndGame()
         SpawnNewCircle();
     }
 
-    // called by circle when it expires (shrinks to 0)
     public void OnCircleExpired()
     {
         if (!running) return;
         SpawnNewCircle();
     }
 
-    // called by background tap catcher (miss taps)
     public void OnMissTap()
     {
         if (!running) return;
@@ -144,7 +189,6 @@ void EndGame()
         UpdateHUD();
     }
 
-    // UI buttons
     public void Retry()
     {
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
@@ -155,7 +199,6 @@ void EndGame()
         SceneManager.LoadScene(quitSceneName);
     }
 
-    // optional: quit early and show gameover panel
     public void QuitRunNow()
     {
         if (!running) return;
