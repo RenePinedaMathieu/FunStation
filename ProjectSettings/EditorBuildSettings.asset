@@ -14,6 +14,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/GamePlaceholder.unity
     guid: b5b7939863b4d334ba18c4288018a7be
+  - enabled: 1
+    path: Assets/Scenes/Game_Stack.unity
+    guid: 18e71a41848f688448d86df7e01a5716
+  - enabled: 1
+    path: Assets/Scenes/Game_Circle.unity
+    guid: 1a0e0dae11923e1428ad3017506a366d
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
   m_UseUCBPForAssetBundles: 0
